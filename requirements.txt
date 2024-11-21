@@ -1,0 +1,10 @@
+torch~=1.13
+torchvision~=0.14.1
+pandas ~= 1.5
+imageio~=2.22
+wandb~=0.13
+coloredlogs~=15.0
+datasetops
+tqdm
+structured-pruning-adapters
+torch-pruning

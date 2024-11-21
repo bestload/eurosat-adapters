@@ -1,0 +1,12 @@
+black
+flake8
+flake8-black
+isort>=5.7
+pytest
+pytest-cov
+jupyterlab
+ipywidgets
+pandas
+matplotlib
+seaborn
+plotly
