@@ -149,23 +149,6 @@ def get_eurosat(datapath=".", image_size=224):
     
     return train_dataset, test_dataset
 
-# Define DataLoader parameters
-batch_size = 32
-num_workers = 4  # Adjust based on your CPU cores
-pin_memory = True if torch.cuda.is_available() else False
-
-train_dataset, val_dataset, test_dataset = get_eurosat()
-
-batch_size = 64
-num_classes = 10
-
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, 
-                                         shuffle=True, num_workers=4, pin_memory=True)
-
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size,
-                                         shuffle=False, num_workers=4, pin_memory=True)
-
-
 
 def get_mnist(datapath="../data/mnist/", download=True):
     """
