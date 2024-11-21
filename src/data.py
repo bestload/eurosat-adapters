@@ -16,6 +16,7 @@ import torch
 from PIL import Image
 from scipy.io import loadmat
 from torchvision import datasets, transforms
+from torch.utils.data import DataLoader, random_split
 
 NUM_CLASSES = {
     "catsanddogs": 2,
