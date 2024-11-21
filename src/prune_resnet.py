@@ -95,6 +95,7 @@ class PruningFineTuner:
             "oxfordflowers102": dataset.get_oxfordflowers102,
             "cifar100": dataset.get_cifar100,
             "stanfordcars": dataset.get_stanfordcars,
+            "eurosat": dataset.get_eurosat,
             # 'imagenet': dataset.get_imagenet,
         }[self.args.dataset.lower()]
         train_dataset, test_dataset = get_dataset(
