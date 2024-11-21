@@ -134,7 +134,7 @@ def get_eurosat(datapath=".", image_size=224):
     test_len = total_size - train_len - val_len
     
     # Split the dataset
-    train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_len, val_len, test_len],
+    train_dataset, test_dataset = random_split(full_dataset, [train_len, val_len, test_len],
                                                             generator=torch.Generator().manual_seed(42))
     
     # Update the transforms for validation and test sets
