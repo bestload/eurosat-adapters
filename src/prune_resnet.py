@@ -392,7 +392,7 @@ class PruningFineTuner:
         # Вывод всех замеров
         # print(f"Все замеры задержки: {latencies}")
        
-        model_size = self.get_model_size(self.model)
+        model_size = self.get_model_size()
         print(f"Model size: {model_size} MB")
         
         start_time = time.time()
