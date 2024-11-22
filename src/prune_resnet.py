@@ -20,6 +20,7 @@ from src.prune_layer import prune_conv_layer
 from src.resnet_kuangliu import ResNet18_kuangliu_c, ResNet50_kuangliu_c
 
 import torch_pruning as tp
+from torch_pruning.utils import add_flops_counting_methods
 
 import os
 import time
@@ -421,8 +422,13 @@ class PruningFineTuner:
         # Move example_inputs to the same device as the model
         example_inputs = example_inputs.to('cpu')  # Move to GPU
         
-        macs, nparams = tp.utils.count_ops_and_params(self.model, example_inputs)
+        # Добавляем методы FLOPs к модели
+        flops_model = add_flops_counting_methods(self.model)
 
+        # Сбрасываем счётчики FLOPs и параметров
+        flops_model.reset_flops_count()
+
+        macs, nparams = tp.utils.count_ops_and_params(self.model, example_inputs)
         print(f"MACs: {macs/1e9} G, #Params: {nparams/1e6} M")
 
         return avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy, macs
