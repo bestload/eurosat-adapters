@@ -478,6 +478,7 @@ class PruningFineTuner:
         :return: Средняя задержка инференса в миллисекундах.
         """
         self.model.eval()
+        self.model.to(device)
 
         if isinstance(inputs, (list, tuple)):
             inputs = [inp.to(device) for inp in inputs]
