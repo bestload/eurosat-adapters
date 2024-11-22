@@ -421,8 +421,10 @@ class PruningFineTuner:
         # Move example_inputs to the same device as the model
         example_inputs = example_inputs.to('cuda')  # Move to GPU
 
-        macs, nparams = tp.utils.count_ops_and_params(self.model, example_inputs)
-        print(f"MACs: {macs/1e9} G, #Params: {nparams/1e6} M")
+        try:
+            macs, nparams = tp.utils.count_ops_and_params(self.model, example_inputs)
+        excep AttributeError:
+            print(f"MACs: {macs/1e9} G, #Params: {nparams/1e6} M")
 
         return avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy, macs
 
