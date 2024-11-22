@@ -20,7 +20,6 @@ from src.prune_layer import prune_conv_layer
 from src.resnet_kuangliu import ResNet18_kuangliu_c, ResNet50_kuangliu_c
 
 import torch_pruning as tp
-from torch_pruning.utils import add_flops_counting_methods
 
 import os
 import time
@@ -379,54 +378,48 @@ class PruningFineTuner:
         # Get class names
         class_names = ['AnnualCrop', 'Forest', 'HerbaceousVegetation', 'Highway', 'Industrial', 'Pasture', 'PermanentCrop', 'Residential', 'River', 'SeaLake']
 
-        # Создание тестовых входных данных (зависит от входного формата модели)
-        batch_size = 32
-        input_shape = (3, 224, 224)
-        test_inputs = torch.randn(batch_size, *input_shape, dtype=torch.float32)
+        # # Создание тестовых входных данных (зависит от входного формата модели)
+        # batch_size = 32
+        # input_shape = (3, 224, 224)
+        # test_inputs = torch.randn(batch_size, *input_shape, dtype=torch.float32)
 
-        # Измерение задержки
-        avg_latency_cpu, latencies = self.measure_latency(test_inputs, device='cpu')
-        avg_latency_gpu, latencies = self.measure_latency(test_inputs, device='cuda')
+        # # Измерение задержки
+        # avg_latency_cpu, latencies = self.measure_latency(test_inputs, device='cpu')
+        # avg_latency_gpu, latencies = self.measure_latency(test_inputs, device='cuda')
 
-        print(f"Средняя задержка инференса на cpu: {avg_latency_cpu:.2f} ms")
-        print(f"Средняя задержка инференса на gpu: {avg_latency_gpu:.2f} ms")
-        # Вывод всех замеров
-        # print(f"Все замеры задержки: {latencies}")
+        # print(f"Средняя задержка инференса на cpu: {avg_latency_cpu:.2f} ms")
+        # print(f"Средняя задержка инференса на gpu: {avg_latency_gpu:.2f} ms")
+        # # Вывод всех замеров
+        # # print(f"Все замеры задержки: {latencies}")
        
-        model_size = self.get_model_size()
-        print(f"Model size: {model_size} MB")
+        # model_size = self.get_model_size()
+        # print(f"Model size: {model_size} MB")
         
-        start_time = time.time()
-        preds, labels = self.evaluate_model_detailed(self.test_loader, class_names)
-        end_time = time.time()
+        # start_time = time.time()
+        # preds, labels = self.evaluate_model_detailed(self.test_loader, class_names)
+        # end_time = time.time()
 
-        # calculation of measured characteristics
+        # # calculation of measured characteristics
 
-        precision = precision_score(labels, preds, average='macro') * 100
-        recall = recall_score(labels, preds, average='macro') * 100
-        accuracy = ((torch.tensor(preds) == torch.tensor(labels)).sum().item() / len(labels)) * 100
+        # precision = precision_score(labels, preds, average='macro') * 100
+        # recall = recall_score(labels, preds, average='macro') * 100
+        # accuracy = ((torch.tensor(preds) == torch.tensor(labels)).sum().item() / len(labels)) * 100
 
-        num_params = sum(p.numel() for p in self.model.parameters())
+        # num_params = sum(p.numel() for p in self.model.parameters())
 
-        elapsed_time = end_time - start_time
+        # elapsed_time = end_time - start_time
 
-        print(f"Total parameters: {num_params:,}")
+        # print(f"Total parameters: {num_params:,}")
 
-        print(f'Accuracy: {accuracy:.2f}%')
-        print(f"Precision: {precision:.2f}%")
-        print(f"Recall: {recall:.2f}%")
+        # print(f'Accuracy: {accuracy:.2f}%')
+        # print(f"Precision: {precision:.2f}%")
+        # print(f"Recall: {recall:.2f}%")
 
-        print(f"Execution time: {elapsed_time:.2f} seconds")
+        # print(f"Execution time: {elapsed_time:.2f} seconds")
                 
         example_inputs = torch.randn(1, 3, 224, 224)
         # Move example_inputs to the same device as the model
-        example_inputs = example_inputs.to('cpu')  # Move to GPU
-        
-        # Добавляем методы FLOPs к модели
-        flops_model = add_flops_counting_methods(self.model)
-
-        # Сбрасываем счётчики FLOPs и параметров
-        flops_model.reset_flops_count()
+        example_inputs = example_inputs.to('cuda')  # Move to GPU
 
         macs, nparams = tp.utils.count_ops_and_params(self.model, example_inputs)
         print(f"MACs: {macs/1e9} G, #Params: {nparams/1e6} M")
