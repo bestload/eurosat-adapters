@@ -478,7 +478,10 @@ class PruningFineTuner:
         :return: Средняя задержка инференса в миллисекундах.
         """
         self.model.eval()
-        
+
+        if isinstance(inputs, np.ndarray):
+            inputs = [torch.from_numpy(inp).to(device) for inp in inputs]
+            
         if isinstance(inputs, (list, tuple)):
             inputs = [inp.to(device) for inp in inputs]
         else:
