@@ -381,7 +381,7 @@ class PruningFineTuner:
         # Создание тестовых входных данных (зависит от входного формата модели)
         batch_size = 32
         input_shape = (3, 224, 224)
-        test_inputs = torch.randn(batch_size, *input_size, dtype=torch.float32)
+        test_inputs = torch.randn(batch_size, *input_shape, dtype=torch.float32)
 
         # Измерение задержки
         avg_latency_cpu, latencies = self.measure_latency(test_inputs, device='cpu')
