@@ -396,7 +396,7 @@ class PruningFineTuner:
         print(f"Model size: {model_size} MB")
         
         start_time = time.time()
-        preds, labels = self.evaluate_model_detailed(self.model, self.test_loader, class_names)
+        preds, labels = self.evaluate_model_detailed(self.test_loader, class_names)
         end_time = time.time()
 
         # calculation of measured characteristics
