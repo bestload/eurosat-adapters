@@ -534,6 +534,8 @@ if __name__ == "__main__":
         logger.add_scalar("train/avg_latency_cpu", avg_latency_cpu)
         logger.add_scalar("train/avg_latency_gpu", avg_latency_gpu)
         logger.add_scalar("train/model_size", model_size)
+        logger.add_scalar("train/precision", precision)
+        logger.add_scalar("train/recall", recall)
 
         prev_train_step = 0
 
@@ -589,7 +591,9 @@ if __name__ == "__main__":
             logger.add_scalar("test/latency_cpu", avg_latency_cpu)
             logger.add_scalar("test/latency_gpu", avg_latency_gpu)
             logger.add_scalar("test/model_size", model_size)
-
+            logger.add_scalar("train/precision", precision)
+            logger.add_scalar("train/recall", recall)
+            
             # Unfreeze all layers
             for param in model.parameters():
                 param.requires_grad = True
@@ -619,6 +623,12 @@ if __name__ == "__main__":
             logger.add_scalar("test/trainable_params", count_trainable_params(model))
             logger.add_scalar("test/total_params", count_total_params(model))
             logger.add_scalar("test/sparsity", 1.0)
+            logger.add_scalar("test/latency_cpu", avg_latency_cpu)
+            logger.add_scalar("test/latency_gpu", avg_latency_gpu)
+            logger.add_scalar("test/model_size", model_size)
+            logger.add_scalar("train/precision", precision)
+            logger.add_scalar("train/recall", recall)
+            
             torch.save(
                 model.state_dict(),
                 f"{logger.log_dir}/{arch}_{args.dataset}_100%.pth",
@@ -682,6 +692,31 @@ if __name__ == "__main__":
                 logger.add_scalar(
                     "test/sparsity", count_fused_params(model) / base_fused_params
                 )
+                
+                # Создание тестовых входных данных (зависит от входного формата модели)
+                batch_size = 32
+                input_shape = (3, 224, 224)
+                test_inputs = [np.random.randn(batch_size, *input_shape).astype(np.float32)]
+
+                # Измерение задержки
+                avg_latency_cpu, latencies = measure_latency(model, test_inputs, device='cpu')
+                avg_latency_gpu, latencies = measure_latency(model, test_inputs, device='cuda')
+
+                print(f"Средняя задержка инференса на cpu: {avg_latency_cpu:.2f} ms")
+                print(f"Средняя задержка инференса на gpu: {avg_latency_gpu:.2f} ms")
+                
+                # Вывод всех замеров
+                # print(f"Все замеры задержки: {latencies}")
+                
+                model_size = get_model_size(model)
+                print(f"Model size: {model_size} MB")
+                
+                logger.add_scalar("test/latency_cpu", avg_latency_cpu)
+                logger.add_scalar("test/latency_gpu", avg_latency_gpu)
+                logger.add_scalar("test/model_size", model_size)
+                logger.add_scalar("train/precision", precision)
+                logger.add_scalar("train/recall", recall)
+                
                 torch.save(
                     model.state_dict(),
                     f"{logger.log_dir}/{arch}_{args.dataset}_{round(fused_params / base_fused_params * 100)}%.pth",
