@@ -521,10 +521,6 @@ if __name__ == "__main__":
         example_inputs = torch.randn(1, 3, 224, 224)
         # Move example_inputs to the same device as the model
         example_inputs = example_inputs.to('cpu')  # Move to GPU
-        
-        macs, nparams = tp.utils.count_ops_and_params(model, example_inputs)
-
-        print(f"MACs: {macs/1e9} G, #Params: {nparams/1e6} M")
 
         logger.add_scalar("train/macs", base_macs)
         logger.add_scalar("train/fused_params", count_fused_params(model))
