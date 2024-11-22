@@ -149,7 +149,6 @@ def get_eurosat(datapath=".", image_size=224):
     
     return train_dataset, test_dataset
 
-
 def get_mnist(datapath="../data/mnist/", download=True):
     """
     The MNIST dataset in PyTorch does not have a development set, and has its own format.

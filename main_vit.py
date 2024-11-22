@@ -14,8 +14,99 @@ from tqdm import tqdm
 import src.data as datasets
 from src.logging import MetricLogger
 
+import os
+import time
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import torchvision.datasets as datasets
+from sklearn.metrics import precision_score, recall_score
+from sklearn.metrics import classification_report, confusion_matrix
+
 logging.getLogger("wandb").setLevel(logging.WARNING)
 
+torch.cuda.empty_cache()
+
+# Get class names
+class_names = ['AnnualCrop', 'Forest', 'HerbaceousVegetation', 'Highway', 'Industrial', 'Pasture', 'PermanentCrop', 'Residential', 'River', 'SeaLake']
+
+# 15. Detailed Evaluation
+def evaluate_model_detailed(model, dataloader, class_names):
+    model.eval()
+    all_preds = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for inputs, labels in dataloader:
+            inputs = inputs.to('cuda')
+            labels = labels.to('cuda')
+            
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+            
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+    
+    # Classification Report
+    print("Classification Report:")
+    print(classification_report(all_labels, all_preds, target_names=class_names))
+    
+    # Confusion Matrix
+    cm = confusion_matrix(all_labels, all_preds)
+    plt.figure(figsize=(10,8))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                xticklabels=class_names, yticklabels=class_names)
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title('Confusion Matrix')
+    plt.show()
+    
+    return all_preds, all_labels
+
+def get_model_size(model, path="temp_model.pth"):
+    torch.save(model.state_dict(), path)
+    size = os.path.getsize(path) / 1e6  # in MB
+    os.remove(path)
+    return size
+
+def measure_latency(model, inputs, warmup_runs=5, measurement_runs=20, device='cpu'):
+    """
+    Измеряет среднюю задержку инференса модели PyTorch.
+
+    :param model: PyTorch модель.
+    :param inputs: Входные данные для модели (тензор или список/кортеж тензоров).
+    :param warmup_runs: Количество прогревочных запусков.
+    :param measurement_runs: Количество запусков для измерения.
+    :param device: Устройство для выполнения инференса ('cpu' или 'cuda').
+    :return: Средняя задержка инференса в миллисекундах.
+    """
+    model.eval()
+    
+    if isinstance(inputs, (list, tuple)):
+        inputs = [inp.to(device) for inp in inputs]
+    else:
+        inputs = inputs.to(device)
+    
+    with torch.no_grad():
+        # Разогрев (warm-up)
+        for _ in range(warmup_runs):
+            outputs = model(inputs)
+            if device == 'cuda':
+                torch.cuda.synchronize()
+        
+        # Измерение задержки
+        latencies = []
+        for _ in range(measurement_runs):
+            start_time = time.time()
+            outputs = model(inputs)
+            if device == 'cuda':
+                torch.cuda.synchronize()
+            end_time = time.time()
+            latency = (end_time - start_time) * 1000  # Преобразование в миллисекунды
+            latencies.append(latency)
+    
+    average_latency = sum(latencies) / len(latencies)
+    return average_latency, latencies
 
 def get_args():
     # Training settings
@@ -387,11 +478,62 @@ if __name__ == "__main__":
         base_macs, _ = tp.utils.count_ops_and_params(model, example_input)
         base_fused_params = count_fused_params(model)
         base_trainable_paramse = count_trainable_params(model)
+
+        # Создание тестовых входных данных (зависит от входного формата модели)
+        batch_size = 32
+        input_shape = (3, 224, 224)
+        test_inputs = [np.random.randn(batch_size, *input_shape).astype(np.float32)]
+
+        # Измерение задержки
+        avg_latency_cpu, latencies = measure_latency(model, test_inputs, device='cpu')
+        avg_latency_gpu, latencies = measure_latency(model, test_inputs, device='cuda')
+
+        print(f"Средняя задержка инференса на cpu: {avg_latency_cpu:.2f} ms")
+        print(f"Средняя задержка инференса на gpu: {avg_latency_gpu:.2f} ms")
+        # Вывод всех замеров
+        # print(f"Все замеры задержки: {latencies}")
+       
+        model_size = get_model_size(model)
+        print(f"Model size: {model_size} MB")
+        
+        start_time = time.time()
+        preds, labels = evaluate_model_detailed(model, test_loader, class_names)
+        end_time = time.time()
+
+        # calculation of measured characteristics
+
+        precision = precision_score(labels, preds, average='macro') * 100
+        recall = recall_score(labels, preds, average='macro') * 100
+        accuracy = ((torch.tensor(preds) == torch.tensor(labels)).sum().item() / len(labels)) * 100
+
+        num_params = sum(p.numel() for p in model.parameters())
+
+        elapsed_time = end_time - start_time
+
+        print(f"Total parameters: {num_params:,}")
+
+        print(f'Accuracy: {accuracy:.2f}%')
+        print(f"Precision: {precision:.2f}%")
+        print(f"Recall: {recall:.2f}%")
+
+        print(f"Execution time: {elapsed_time:.2f} seconds")
+                
+        example_inputs = torch.randn(1, 3, 224, 224)
+        # Move example_inputs to the same device as the model
+        example_inputs = example_inputs.to('cpu')  # Move to GPU
+        
+        macs, nparams = tp.utils.count_ops_and_params(model, example_inputs)
+
+        print(f"MACs: {macs/1e9} G, #Params: {nparams/1e6} M")
+
         logger.add_scalar("train/macs", base_macs)
         logger.add_scalar("train/fused_params", count_fused_params(model))
         logger.add_scalar("train/trainable_params", count_trainable_params(model))
         logger.add_scalar("train/total_params", count_total_params(model))
         logger.add_scalar("train/sparsity", 1.0)
+        logger.add_scalar("train/avg_latency_cpu", avg_latency_cpu)
+        logger.add_scalar("train/avg_latency_gpu", avg_latency_gpu)
+        logger.add_scalar("train/model_size", model_size)
 
         prev_train_step = 0
 
@@ -418,6 +560,25 @@ if __name__ == "__main__":
             test_loss, test_acc = test(
                 model, test_loader, limit_test_batches=args.limit_test_batches
             )
+            
+            # Создание тестовых входных данных (зависит от входного формата модели)
+            batch_size = 32
+            input_shape = (3, 224, 224)
+            test_inputs = [np.random.randn(batch_size, *input_shape).astype(np.float32)]
+
+            # Измерение задержки
+            avg_latency_cpu, latencies = measure_latency(model, test_inputs, device='cpu')
+            avg_latency_gpu, latencies = measure_latency(model, test_inputs, device='cuda')
+
+            print(f"Средняя задержка инференса на cpu: {avg_latency_cpu:.2f} ms")
+            print(f"Средняя задержка инференса на gpu: {avg_latency_gpu:.2f} ms")
+            
+            # Вывод всех замеров
+            # print(f"Все замеры задержки: {latencies}")
+            
+            model_size = get_model_size(model)
+            print(f"Model size: {model_size} MB")
+            
             logger.add_scalar("test/acc", test_acc)
             logger.add_scalar("test/loss", test_loss)
             logger.add_scalar("test/macs", base_macs)
@@ -425,6 +586,9 @@ if __name__ == "__main__":
             logger.add_scalar("test/trainable_params", count_trainable_params(model))
             logger.add_scalar("test/total_params", count_total_params(model))
             logger.add_scalar("test/sparsity", 1.0)
+            logger.add_scalar("test/latency_cpu", avg_latency_cpu)
+            logger.add_scalar("test/latency_gpu", avg_latency_gpu)
+            logger.add_scalar("test/model_size", model_size)
 
             # Unfreeze all layers
             for param in model.parameters():
