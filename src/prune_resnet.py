@@ -421,12 +421,7 @@ class PruningFineTuner:
         # Move example_inputs to the same device as the model
         example_inputs = example_inputs.to('cuda')  # Move to GPU
 
-        try:
-            macs, nparams = tp.utils.count_ops_and_params(self.model, example_inputs)
-        except AttributeError:
-            print(f"MACs: {macs/1e9} G, #Params: {nparams/1e6} M")
-
-        return avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy, macs
+        return avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy
 
     # 15. Detailed Evaluation
     def evaluate_model_detailed(self, dataloader, class_names):
@@ -515,7 +510,7 @@ class PruningFineTuner:
         self.temp = 0
         test_accuracy, test_loss, flop_value, param_value = self.test()
 
-        avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy, macs = self.measure_parameters()
+        avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy = self.measure_parameters()
 
         # Make sure all the layers are trainable
         # for param in self.model.parameters():
@@ -547,7 +542,6 @@ class PruningFineTuner:
                 "precision": precision,
                 "recall": recall,
                 "accuracy": accuracy,
-                "macs": macs,
             }
         )
         self.COUNT_ROW += 1
@@ -589,7 +583,7 @@ class PruningFineTuner:
             self.logger.debug(f"Pruning ratio: {self.ratio_pruned_filters}")
             (test_accuracy, test_loss, flop_value, param_value) = self.test()
 
-            (avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy, macs) = self.measure_parameters()
+            (avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy) = self.measure_parameters()
 
             metrics = {
                 "test/ratio_pruned": self.ratio_pruned_filters,
@@ -603,7 +597,6 @@ class PruningFineTuner:
                 "test/precision": precision,
                 "test/recall": recall,
                 "test/accuracy": accuracy,
-                "test/macs": macs,
             }
             self.df.loc[self.COUNT_ROW] = pd.Series(metrics)
             self.logger.add_scalars(metrics)
@@ -633,7 +626,6 @@ class PruningFineTuner:
             "test/precision": precision,
             "test/recall": recall,
             "test/accuracy": accuracy,
-            "test/macs": macs,
         }
         self.df.loc[self.COUNT_ROW] = pd.Series(metrics)
         self.logger.add_scalars(metrics, step=self.COUNT_ROW)
