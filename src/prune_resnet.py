@@ -384,8 +384,8 @@ class PruningFineTuner:
         test_inputs = [np.random.randn(batch_size, *input_shape).astype(np.float32)]
 
         # Измерение задержки
-        avg_latency_cpu, latencies = self.measure_latency(self.model, test_inputs, device='cpu')
-        avg_latency_gpu, latencies = self.measure_latency(self.model, test_inputs, device='cuda')
+        avg_latency_cpu, latencies = self.measure_latency(test_inputs, device='cpu')
+        avg_latency_gpu, latencies = self.measure_latency(test_inputs, device='cuda')
 
         print(f"Средняя задержка инференса на cpu: {avg_latency_cpu:.2f} ms")
         print(f"Средняя задержка инференса на gpu: {avg_latency_gpu:.2f} ms")
