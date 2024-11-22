@@ -384,19 +384,19 @@ class PruningFineTuner:
         test_inputs = [np.random.randn(batch_size, *input_shape).astype(np.float32)]
 
         # Измерение задержки
-        avg_latency_cpu, latencies = measure_latency(self.model, test_inputs, device='cpu')
-        avg_latency_gpu, latencies = measure_latency(self.model, test_inputs, device='cuda')
+        avg_latency_cpu, latencies = self.measure_latency(self.model, test_inputs, device='cpu')
+        avg_latency_gpu, latencies = self.measure_latency(self.model, test_inputs, device='cuda')
 
         print(f"Средняя задержка инференса на cpu: {avg_latency_cpu:.2f} ms")
         print(f"Средняя задержка инференса на gpu: {avg_latency_gpu:.2f} ms")
         # Вывод всех замеров
         # print(f"Все замеры задержки: {latencies}")
        
-        model_size = get_model_size(self.model)
+        model_size = self.get_model_size(self.model)
         print(f"Model size: {model_size} MB")
         
         start_time = time.time()
-        preds, labels = evaluate_model_detailed(self.model, self.test_loader, class_names)
+        preds, labels = self.evaluate_model_detailed(self.model, self.test_loader, class_names)
         end_time = time.time()
 
         # calculation of measured characteristics
@@ -425,83 +425,85 @@ class PruningFineTuner:
 
         print(f"MACs: {macs/1e9} G, #Params: {nparams/1e6} M")
 
-# 15. Detailed Evaluation
-def evaluate_model_detailed(model, dataloader, class_names):
-    model.eval()
-    all_preds = []
-    all_labels = []
-    
-    with torch.no_grad():
-        for inputs, labels in dataloader:
-            inputs = inputs.to('cuda')
-            labels = labels.to('cuda')
-            
-            outputs = model(inputs)
-            _, preds = torch.max(outputs, 1)
-            
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-    
-    # Classification Report
-    print("Classification Report:")
-    print(classification_report(all_labels, all_preds, target_names=class_names))
-    
-    # Confusion Matrix
-    cm = confusion_matrix(all_labels, all_preds)
-    plt.figure(figsize=(10,8))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                xticklabels=class_names, yticklabels=class_names)
-    plt.xlabel('Predicted')
-    plt.ylabel('Actual')
-    plt.title('Confusion Matrix')
-    plt.show()
-    
-    return all_preds, all_labels
+        return avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy, macs
 
-def get_model_size(model, path="temp_model.pth"):
-    torch.save(model.state_dict(), path)
-    size = os.path.getsize(path) / 1e6  # in MB
-    os.remove(path)
-    return size
-
-def measure_latency(model, inputs, warmup_runs=5, measurement_runs=20, device='cpu'):
-    """
-    Измеряет среднюю задержку инференса модели PyTorch.
-
-    :param model: PyTorch модель.
-    :param inputs: Входные данные для модели (тензор или список/кортеж тензоров).
-    :param warmup_runs: Количество прогревочных запусков.
-    :param measurement_runs: Количество запусков для измерения.
-    :param device: Устройство для выполнения инференса ('cpu' или 'cuda').
-    :return: Средняя задержка инференса в миллисекундах.
-    """
-    model.eval()
-    
-    if isinstance(inputs, (list, tuple)):
-        inputs = [inp.to(device) for inp in inputs]
-    else:
-        inputs = inputs.to(device)
-    
-    with torch.no_grad():
-        # Разогрев (warm-up)
-        for _ in range(warmup_runs):
-            outputs = model(inputs)
-            if device == 'cuda':
-                torch.cuda.synchronize()
+    # 15. Detailed Evaluation
+    def evaluate_model_detailed(self, dataloader, class_names):
+        self.model.eval()
+        all_preds = []
+        all_labels = []
         
-        # Измерение задержки
-        latencies = []
-        for _ in range(measurement_runs):
-            start_time = time.time()
-            outputs = model(inputs)
-            if device == 'cuda':
-                torch.cuda.synchronize()
-            end_time = time.time()
-            latency = (end_time - start_time) * 1000  # Преобразование в миллисекунды
-            latencies.append(latency)
-    
-    average_latency = sum(latencies) / len(latencies)
-    return average_latency, latencies
+        with torch.no_grad():
+            for inputs, labels in dataloader:
+                inputs = inputs.to('cuda')
+                labels = labels.to('cuda')
+                
+                outputs = self.model(inputs)
+                _, preds = torch.max(outputs, 1)
+                
+                all_preds.extend(preds.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+        
+        # Classification Report
+        print("Classification Report:")
+        print(classification_report(all_labels, all_preds, target_names=class_names))
+        
+        # Confusion Matrix
+        cm = confusion_matrix(all_labels, all_preds)
+        plt.figure(figsize=(10,8))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=class_names, yticklabels=class_names)
+        plt.xlabel('Predicted')
+        plt.ylabel('Actual')
+        plt.title('Confusion Matrix')
+        plt.show()
+        
+        return all_preds, all_labels
+
+    def get_model_size(self, path="temp_model.pth"):
+        torch.save(self.model.state_dict(), path)
+        size = os.path.getsize(path) / 1e6  # in MB
+        os.remove(path)
+        return size
+
+    def measure_latency(self, inputs, warmup_runs=5, measurement_runs=20, device='cpu'):
+        """
+        Измеряет среднюю задержку инференса модели PyTorch.
+
+        :param model: PyTorch модель.
+        :param inputs: Входные данные для модели (тензор или список/кортеж тензоров).
+        :param warmup_runs: Количество прогревочных запусков.
+        :param measurement_runs: Количество запусков для измерения.
+        :param device: Устройство для выполнения инференса ('cpu' или 'cuda').
+        :return: Средняя задержка инференса в миллисекундах.
+        """
+        self.model.eval()
+        
+        if isinstance(inputs, (list, tuple)):
+            inputs = [inp.to(device) for inp in inputs]
+        else:
+            inputs = inputs.to(device)
+        
+        with torch.no_grad():
+            # Разогрев (warm-up)
+            for _ in range(warmup_runs):
+                outputs = self.model(inputs)
+                if device == 'cuda':
+                    torch.cuda.synchronize()
+            
+            # Измерение задержки
+            latencies = []
+            for _ in range(measurement_runs):
+                start_time = time.time()
+                outputs = self.model(inputs)
+                if device == 'cuda':
+                    torch.cuda.synchronize()
+                end_time = time.time()
+                latency = (end_time - start_time) * 1000  # Преобразование в миллисекунды
+                latencies.append(latency)
+        
+        average_latency = sum(latencies) / len(latencies)
+        return average_latency, latencies
 
     def prune(self):
         self.save_loss = True
@@ -510,6 +512,8 @@ def measure_latency(model, inputs, warmup_runs=5, measurement_runs=20, device='c
         # Get the accuracy before pruning
         self.temp = 0
         test_accuracy, test_loss, flop_value, param_value = self.test()
+
+        avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy, macs = self.measure_parameters()
 
         # Make sure all the layers are trainable
         # for param in self.model.parameters():
@@ -535,6 +539,13 @@ def measure_latency(model, inputs, warmup_runs=5, measurement_runs=20, device='c
                 "test_loss": test_loss,
                 "flops": flop_value,
                 "params": param_value,
+                "avg_latency_cpu": avg_latency_cpu,
+                "avg_latency_gpu": avg_latency_gpu,
+                "model_size": model_size,
+                "precision": precision,
+                "recall": recall,
+                "accuracy": accuracy,
+                "macs": macs,
             }
         )
         self.COUNT_ROW += 1
@@ -576,12 +587,21 @@ def measure_latency(model, inputs, warmup_runs=5, measurement_runs=20, device='c
             self.logger.debug(f"Pruning ratio: {self.ratio_pruned_filters}")
             (test_accuracy, test_loss, flop_value, param_value) = self.test()
 
+            (avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy, macs) = self.measure_parameters()
+
             metrics = {
                 "test/ratio_pruned": self.ratio_pruned_filters,
                 "test/acc": test_accuracy,
                 "test/loss": test_loss,
                 "test/flops": flop_value,
                 "test/params": param_value,
+                "test/avg_latency_cpu": avg_latency_cpu,
+                "test/avg_latency_gpu": avg_latency_gpu,
+                "test/model_size": model_size,
+                "test/precision": precision,
+                "test/recall": recall,
+                "test/accuracy": accuracy,
+                "test/macs": macs,
             }
             self.df.loc[self.COUNT_ROW] = pd.Series(metrics)
             self.logger.add_scalars(metrics)
@@ -605,6 +625,13 @@ def measure_latency(model, inputs, warmup_runs=5, measurement_runs=20, device='c
             "test/test_loss": test_loss,
             "test/flops": flop_value,
             "test/params": param_value,
+            "test/avg_latency_cpu": avg_latency_cpu,
+            "test/avg_latency_gpu": avg_latency_gpu,
+            "test/model_size": model_size,
+            "test/precision": precision,
+            "test/recall": recall,
+            "test/accuracy": accuracy,
+            "test/macs": macs,
         }
         self.df.loc[self.COUNT_ROW] = pd.Series(metrics)
         self.logger.add_scalars(metrics, step=self.COUNT_ROW)
