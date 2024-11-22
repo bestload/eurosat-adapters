@@ -423,7 +423,7 @@ class PruningFineTuner:
 
         try:
             macs, nparams = tp.utils.count_ops_and_params(self.model, example_inputs)
-        excep AttributeError:
+        except AttributeError:
             print(f"MACs: {macs/1e9} G, #Params: {nparams/1e6} M")
 
         return avg_latency_cpu, avg_latency_gpu, model_size, precision, recall, accuracy, macs
